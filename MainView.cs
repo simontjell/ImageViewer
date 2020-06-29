@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -27,27 +28,43 @@ namespace ImageViewer
 
         private void LoadImage(FileInfo imagePath, Image image)
         {
-            var bitmapImage = new BitmapImage();
-            bitmapImage.BeginInit();
-            bitmapImage.StreamSource = new MemoryStream();
-            using(var imageStream = imagePath.OpenRead())
-            {
-                imageStream.CopyTo(bitmapImage.StreamSource);
-                bitmapImage.StreamSource.Position = 0;
-                imageStream.Close();
-            }
             try
             {
+                var bitmapImage = new BitmapImage();
+                bitmapImage.BeginInit();
+                bitmapImage.StreamSource = new MemoryStream();
+            
+                while(true)
+                {
+                    try
+                    {
+                        using(var imageStream = imagePath.OpenRead())
+                        {
+                            imageStream.CopyTo(bitmapImage.StreamSource);
+                            imageStream.Close();
+                            bitmapImage.StreamSource.Position = 0;
+                        }
+
+                        break;
+                    }
+                    catch(IOException exc)
+                    {
+                        if(exc.Message.StartsWith("The process cannot access the file"))
+                        {
+                            Thread.Sleep(10);
+                        }
+                        else throw;
+                    }
+                }
                 bitmapImage.EndInit();
+                image.Stretch = Stretch.None;
+                image.Source = bitmapImage;
             }
-            catch(NotSupportedException exc)
+            catch(Exception exc)
             {
                 MessageBox.Show("Unable to open image: " + exc.Message);
                 Application.Current.MainWindow.Close();
             }
-            image.Stretch = Stretch.None;
-            image.Source = bitmapImage;
         }
-
     }
 }
